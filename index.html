@@ -273,3 +273,217 @@
     </script>
 </body>
 </html>
+=======
+ 1	<!DOCTYPE html>
+     2	<html lang="pt-BR">
+     3	<head>
+     4	    <meta charset="UTF-8">
+     5	    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     6	    <title>Gran Estudos — Histórico de Questões (NotebookLM)</title>
+     7	    <style>
+     8	        body {
+     9	            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    10	            line-height: 1.6;
+    11	            color: #333;
+    12	            max-width: 900px;
+    13	            margin: 0 auto;
+    14	            padding: 20px;
+    15	            background-color: #f9f9f9;
+    16	        }
+    17	        header {
+    18	            background-color: #fff;
+    19	            padding: 20px;
+    20	            border-radius: 8px;
+    21	            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    22	            margin-bottom: 20px;
+    23	            text-align: center;
+    24	        }
+    25	        h1 {
+    26	            color: #2c3e50;
+    27	            font-size: 1.5rem;
+    28	            margin: 0;
+    29	        }
+    30	        .controls {
+    31	            margin-top: 15px;
+    32	        }
+    33	        button {
+    34	            background-color: #3498db;
+    35	            color: white;
+    36	            border: none;
+    37	            padding: 10px 20px;
+    38	            border-radius: 5px;
+    39	            cursor: pointer;
+    40	            font-size: 14px;
+    41	            transition: background 0.3s;
+    42	        }
+    43	        button:hover {
+    44	            background-color: #2980b9;
+    45	        }
+    46	        button:disabled {
+    47	            background-color: #bdc3c7;
+    48	            cursor: not-allowed;
+    49	        }
+    50	        .status {
+    51	            font-size: 0.9rem;
+    52	            color: #666;
+    53	            margin-top: 10px;
+    54	        }
+    55	        #content-area {
+    56	            background-color: #fff;
+    57	            padding: 30px;
+    58	            border-radius: 8px;
+    59	            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    60	            white-space: pre-wrap;
+    61	            min-height: 200px;
+    62	        }
+    63	        .loading {
+    64	            color: #007bff;
+    65	            font-weight: bold;
+    66	        }
+    67	        .error {
+    68	            color: #dc3545;
+    69	            font-weight: bold;
+    70	        }
+    71	    </style>
+    72	</head>
+    73	<body>
+    74	
+    75	    <header>
+    76	        <h1>Gran Estudos — Histórico de Questões</h1>
+    77	        <div class="controls">
+    78	            <button id="refresh-btn" onclick="fetchData()">🔄 Atualizar Dados</button>
+    79	        </div>
+    80	        <div class="status" id="status-msg">Clique em "Atualizar Dados" para carregar o conteúdo da planilha.</div>
+    81	    </header>
+    82	
+    83	    <main>
+    84	        <div id="content-area">
+    85	            <span style="color: #999;">Os dados aparecerão aqui após clicar no botão de atualizar. O conteúdo será mantido salvo enquanto você navegar nesta página.</span>
+    86	        </div>
+    87	    </main>
+    88	
+    89	    <script>
+    90	        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTw8xiesIkLeVZzonLOKADUxOpVQp8vVrtlIW67gpTOF9EVVdIFbOEXjN2VYLYGjJDbKZcsHxOX47g0/pub?gid=282526832&single=true&output=csv';
+    91	        const CACHE_KEY = 'gran_estudos_notebooklm_data';
+    92	        const CACHE_TIME_KEY = 'gran_estudos_notebooklm_time';
+    93	
+    94	        // Carrega dados salvos ao iniciar (se existir)
+    95	        window.addEventListener('DOMContentLoaded', () => {
+    96	            loadFromCache();
+    97	        });
+    98	
+    99	        function loadFromCache() {
+   100	            const cachedData = localStorage.getItem(CACHE_KEY);
+   101	            const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+   102	            const contentArea = document.getElementById('content-area');
+   103	            const statusMsg = document.getElementById('status-msg');
+   104	
+   105	            if (cachedData && cachedTime) {
+   106	                const dateStr = new Date(parseInt(cachedTime)).toLocaleString();
+   107	                statusMsg.textContent = `Dados carregados anteriormente em ${dateStr}. Clique em "Atualizar Dados" para buscar a versão mais recente.`;
+   108	                statusMsg.style.color = '#28a745';
+   109	                contentArea.textContent = cachedData;
+   110	            } else {
+   111	                statusMsg.textContent = 'Nenhum dado em cache. Clique em "Atualizar Dados" para carregar da planilha.';
+   112	            }
+   113	        }
+   114	
+   115	        async function fetchData() {
+   116	            const btn = document.getElementById('refresh-btn');
+   117	            const contentArea = document.getElementById('content-area');
+   118	            const statusMsg = document.getElementById('status-msg');
+   119	
+   120	            btn.disabled = true;
+   121	            btn.textContent = 'Carregando...';
+   122	            contentArea.innerHTML = '<span class="loading">Buscando dados atualizados na planilha Google Sheets...</span>';
+   123	
+   124	            try {
+   125	                // Adiciona timestamp para evitar cache do navegador
+   126	                const fetchUrl = `${SHEET_CSV_URL}&t=${new Date().getTime()}`;
+   127	                const response = await fetch(fetchUrl);
+   128	
+   129	                if (!response.ok) {
+   130	                    throw new Error(`Erro HTTP: ${response.status}`);
+   131	                }
+   132	
+   133	                const csvText = await response.text();
+   134	                
+   135	                // Processa o CSV para formato de texto legível pelo NotebookLM
+   136	                const formattedText = processCSVToText(csvText);
+   137	
+   138	                // Salva no cache do navegador
+   139	                localStorage.setItem(CACHE_KEY, formattedText);
+   140	                localStorage.setItem(CACHE_TIME_KEY, new Date().getTime().toString());
+   141	
+   142	                // Atualiza a tela
+   143	                contentArea.textContent = formattedText;
+   144	                const nowStr = new Date().toLocaleString();
+   145	                statusMsg.textContent = `Dados atualizados com sucesso em ${nowStr}. Pronto para análise no NotebookLM!`;
+   146	                statusMsg.style.color = '#28a745';
+   147	
+   148	            } catch (error) {
+   149	                console.error('Erro ao buscar dados:', error);
+   150	                contentArea.innerHTML = `<span class="error">Erro ao carregar dados: ${error.message}.\nVerifique sua conexão ou se a planilha está pública.</span>`;
+   151	                statusMsg.textContent = 'Falha no carregamento. Tente novamente.';
+   152	                statusMsg.style.color = '#dc3545';
+   153	            } finally {
+   154	                btn.disabled = false;
+   155	                btn.textContent = '🔄 Atualizar Dados';
+   156	            }
+   157	        }
+   158	
+   159	        function processCSVToText(csv) {
+   160	            const rows = csv.split('\n').map(row => row.trim()).filter(row => row.length > 0);
+   161	            
+   162	            if (rows.length === 0) return "Nenhum dado encontrado na planilha.";
+   163	
+   164	            const headers = parseCSVLine(rows[0]);
+   165	            let output = "";
+   166	
+   167	            output += `RELATÓRIO DE QUESTÕES - GRAN ESTUDOS\n`;
+   168	            output += `Total de registros: ${rows.length - 1}\n`;
+   169	            output += `==================================================\n\n`;
+   170	
+   171	            for (let i = 1; i < rows.length; i++) {
+   172	                const values = parseCSVLine(rows[i]);
+   173	                output += `QUESTÃO #${i}\n`;
+   174	                
+   175	                headers.forEach((header, index) => {
+   176	                    const value = values[index] || "N/A";
+   177	                    output += `${header}: ${value}\n`;
+   178	                });
+   179	                output += `\n--------------------------------------------------\n\n`;
+   180	            }
+   181	
+   182	            return output;
+   183	        }
+   184	
+   185	        function parseCSVLine(text) {
+   186	            const result = [];
+   187	            let current = '';
+   188	            let inQuotes = false;
+   189	            
+   190	            for (let i = 0; i < text.length; i++) {
+   191	                const char = text[i];
+   192	                const nextChar = text[i + 1];
+   193	
+   194	                if (char === '"') {
+   195	                    if (inQuotes && nextChar === '"') {
+   196	                        current += '"';
+   197	                        i++;
+   198	                    } else {
+   199	                        inQuotes = !inQuotes;
+   200	                    }
+   201	                } else if (char === ',' && !inQuotes) {
+   202	                    result.push(current.trim());
+   203	                    current = '';
+   204	                } else {
+   205	                    current += char;
+   206	                }
+   207	            }
+   208	            result.push(current.trim());
+   209	            return result;
+   210	        }
+   211	    </script>
+   212	</body>
+   213	</html>
