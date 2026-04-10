@@ -1,414 +1,213 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planilha Google Sheets - NotebookLM</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            background: white;
-            border-radius: 8px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        h1 {
-            color: #1a73e8;
-            margin-bottom: 10px;
-        }
-        .info {
-            color: #666;
-            margin-bottom: 20px;
-            font-size: 14px;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        button {
-            background-color: #1a73e8;
-            color: white;
-            border: none;
-            padding: 12px 24px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 500;
-            transition: background-color 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        button:hover {
-            background-color: #1557b0;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        button svg {
-            width: 16px;
-            height: 16px;
-        }
-        .status {
-            padding: 10px 15px;
-            border-radius: 6px;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .status.success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .status.info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        .status.loading {
-            background-color: #fff3cd;
-            color: #856404;
-            border: 1px solid #ffeeba;
-        }
-        #data-container {
-            margin-top: 20px;
-            overflow-x: auto;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 14px;
-        }
-        th, td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        th {
-            background-color: #1a73e8;
-            color: white;
-            position: sticky;
-            top: 0;
-        }
-        tr:nth-child(even) {
-            background-color: #f9f9f9;
-        }
-        tr:hover {
-            background-color: #f1f1f1;
-        }
-        .raw-data {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            white-space: pre-wrap;
-            word-break: break-word;
-            max-height: 500px;
-            overflow-y: auto;
-            border: 1px solid #ddd;
-        }
-        .view-toggle {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 15px;
-        }
-        .view-toggle button {
-            background-color: #6c757d;
-        }
-        .view-toggle button.active {
-            background-color: #1a73e8;
-        }
-        .spinner {
-            display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #ffffff;
-            border-radius: 50%;
-            border-top-color: transparent;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-        .hidden {
-            display: none;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>📊 Planilha Google Sheets</h1>
-        
-        <div class="controls">
-            <button id="refresh-btn" onclick="fetchData()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M23 4v6h-6"></path>
-                    <path d="M1 20v-6h6"></path>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-                Atualizar Dados
-            </button>
-            <button onclick="downloadCSV()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                </svg>
-                Baixar CSV
-            </button>
-            <span id="last-update" style="margin-left: auto; color: #666; font-size: 13px;"></span>
-        </div>
-
-        <div id="status" class="status info hidden"></div>
-
-        <div class="view-toggle">
-            <button id="view-table-btn" class="active" onclick="switchView('table')">Visualização em Tabela</button>
-            <button id="view-raw-btn" onclick="switchView('raw')">Visualização Raw (CSV)</button>
-        </div>
-
-        <div id="data-container">
-            <p style="color: #666; text-align: center; padding: 40px;">
-                Clique em "Atualizar Dados" para carregar o conteúdo da planilha.
-            </p>
-        </div>
-    </div>
-
-    <script>
-        const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTw8xiesIkLeVZzonLOKADUxOpVQp8vVrtlIW67gpTOF9EVVdIFbOEXjN2VYLYGjJDbKZcsHxOX47g0/pub?gid=282526832&single=true&output=csv';
-        let currentData = '';
-        let currentView = 'table';
-
-        // Carregar dados salvos ao iniciar
-        window.addEventListener('DOMContentLoaded', () => {
-            const savedData = localStorage.getItem('sheetData');
-            const savedTime = localStorage.getItem('sheetDataTime');
-            
-            if (savedData) {
-                currentData = savedData;
-                document.getElementById('data-container').innerHTML = renderContent(savedData);
-                updateStatus('Dados carregados do cache local.', 'success');
-                if (savedTime) {
-                    document.getElementById('last-update').textContent = 
-                        `Última atualização: ${new Date(parseInt(savedTime)).toLocaleString('pt-BR')}`;
-                }
-            } else {
-                updateStatus('Nenhum dado em cache. Clique em "Atualizar Dados" para carregar.', 'info');
-            }
-        });
-
-        function showLoading() {
-            const btn = document.getElementById('refresh-btn');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner"></span> Atualizando...';
-        }
-
-        function hideLoading() {
-            const btn = document.getElementById('refresh-btn');
-            btn.disabled = false;
-            btn.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M23 4v6h-6"></path>
-                    <path d="M1 20v-6h6"></path>
-                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-                </svg>
-                Atualizar Dados
-            `;
-        }
-
-        function updateStatus(message, type) {
-            const statusEl = document.getElementById('status');
-            statusEl.textContent = message;
-            statusEl.className = `status ${type}`;
-            statusEl.classList.remove('hidden');
-            
-            if (type === 'success' || type === 'error') {
-                setTimeout(() => {
-                    statusEl.classList.add('hidden');
-                }, 5000);
-            }
-        }
-
-        async function fetchData() {
-            showLoading();
-            updateStatus('Buscando dados atualizados...', 'loading');
-            
-            try {
-                // Adiciona timestamp para evitar cache
-                const response = await fetch(`${CSV_URL}&t=${Date.now()}`);
-                
-                if (!response.ok) {
-                    throw new Error(`Erro HTTP: ${response.status}`);
-                }
-                
-                const data = await response.text();
-                currentData = data;
-                
-                // Salvar no localStorage
-                localStorage.setItem('sheetData', data);
-                localStorage.setItem('sheetDataTime', Date.now().toString());
-                
-                // Atualizar visualização
-                document.getElementById('data-container').innerHTML = renderContent(data);
-                
-                const now = new Date();
-                document.getElementById('last-update').textContent = 
-                    `Última atualização: ${now.toLocaleString('pt-BR')}`;
-                
-                updateStatus(`Dados atualizados com sucesso! ${countRows(data)} linhas carregadas.`, 'success');
-            } catch (error) {
-                console.error('Erro ao buscar dados:', error);
-                updateStatus(`Erro ao atualizar: ${error.message}. Usando dados em cache se disponíveis.`, 'error');
-                
-                // Se falhar e tiver dados em cache, mantém os dados antigos
-                if (currentData) {
-                    document.getElementById('data-container').innerHTML = renderContent(currentData);
-                }
-            } finally {
-                hideLoading();
-            }
-        }
-
-        function countRows(csvText) {
-            return csvText.split('\n').filter(line => line.trim()).length - 1; // -1 para o cabeçalho
-        }
-
-        function parseCSV(csvText) {
-            const lines = csvText.split('\n').filter(line => line.trim());
-            if (lines.length === 0) return [];
-            
-            const result = [];
-            const headers = parseCSVLine(lines[0]);
-            
-            for (let i = 1; i < lines.length; i++) {
-                const values = parseCSVLine(lines[i]);
-                if (values.length === headers.length) {
-                    const row = {};
-                    headers.forEach((header, index) => {
-                        row[header] = values[index];
-                    });
-                    result.push(row);
-                }
-            }
-            
-            return result;
-        }
-
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                
-                if (char === '"') {
-                    if (inQuotes && line[i + 1] === '"') {
-                        current += '"';
-                        i++;
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            result.push(current);
-            return result.map(val => val.trim());
-        }
-
-        function renderContent(csvText) {
-            if (currentView === 'raw') {
-                return `<div class="raw-data">${escapeHtml(csvText)}</div>`;
-            } else {
-                return renderTable(csvText);
-            }
-        }
-
-        function renderTable(csvText) {
-            const data = parseCSV(csvText);
-            if (data.length === 0) {
-                return '<p style="color: #666; text-align: center; padding: 40px;">Nenhum dado encontrado.</p>';
-            }
-            
-            const headers = Object.keys(data[0]);
-            
-            let html = '<table><thead><tr>';
-            headers.forEach(header => {
-                html += `<th>${escapeHtml(header)}</th>`;
-            });
-            html += '</tr></thead><tbody>';
-            
-            data.forEach(row => {
-                html += '<tr>';
-                headers.forEach(header => {
-                    html += `<td>${escapeHtml(row[header])}</td>`;
-                });
-                html += '</tr>';
-            });
-            
-            html += '</tbody></table>';
-            return html;
-        }
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-
-        function switchView(view) {
-            currentView = view;
-            
-            document.getElementById('view-table-btn').classList.toggle('active', view === 'table');
-            document.getElementById('view-raw-btn').classList.toggle('active', view === 'raw');
-            
-            if (currentData) {
-                document.getElementById('data-container').innerHTML = renderContent(currentData);
-            }
-        }
-
-        function downloadCSV() {
-            if (!currentData) {
-                updateStatus('Nenhum dado para baixar. Atualize primeiro.', 'error');
-                return;
-            }
-            
-            const blob = new Blob([currentData], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            
-            link.setAttribute('href', url);
-            link.setAttribute('download', `planilha-${new Date().toISOString().slice(0,10)}.csv`);
-            link.style.visibility = 'hidden';
-            
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            
-            updateStatus('Download iniciado!', 'success');
-        }
-    </script>
-</body>
-</html>
+ 1	<!DOCTYPE html>
+     2	<html lang="pt-BR">
+     3	<head>
+     4	    <meta charset="UTF-8">
+     5	    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+     6	    <title>Gran Estudos — Histórico de Questões (NotebookLM)</title>
+     7	    <style>
+     8	        body {
+     9	            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    10	            line-height: 1.6;
+    11	            color: #333;
+    12	            max-width: 900px;
+    13	            margin: 0 auto;
+    14	            padding: 20px;
+    15	            background-color: #f9f9f9;
+    16	        }
+    17	        header {
+    18	            background-color: #fff;
+    19	            padding: 20px;
+    20	            border-radius: 8px;
+    21	            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    22	            margin-bottom: 20px;
+    23	            text-align: center;
+    24	        }
+    25	        h1 {
+    26	            color: #2c3e50;
+    27	            font-size: 1.5rem;
+    28	            margin: 0;
+    29	        }
+    30	        .controls {
+    31	            margin-top: 15px;
+    32	        }
+    33	        button {
+    34	            background-color: #3498db;
+    35	            color: white;
+    36	            border: none;
+    37	            padding: 10px 20px;
+    38	            border-radius: 5px;
+    39	            cursor: pointer;
+    40	            font-size: 14px;
+    41	            transition: background 0.3s;
+    42	        }
+    43	        button:hover {
+    44	            background-color: #2980b9;
+    45	        }
+    46	        button:disabled {
+    47	            background-color: #bdc3c7;
+    48	            cursor: not-allowed;
+    49	        }
+    50	        .status {
+    51	            font-size: 0.9rem;
+    52	            color: #666;
+    53	            margin-top: 10px;
+    54	        }
+    55	        #content-area {
+    56	            background-color: #fff;
+    57	            padding: 30px;
+    58	            border-radius: 8px;
+    59	            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    60	            white-space: pre-wrap;
+    61	            min-height: 200px;
+    62	        }
+    63	        .loading {
+    64	            color: #007bff;
+    65	            font-weight: bold;
+    66	        }
+    67	        .error {
+    68	            color: #dc3545;
+    69	            font-weight: bold;
+    70	        }
+    71	    </style>
+    72	</head>
+    73	<body>
+    74	
+    75	    <header>
+    76	        <h1>Gran Estudos — Histórico de Questões</h1>
+    77	        <div class="controls">
+    78	            <button id="refresh-btn" onclick="fetchData()">🔄 Atualizar Dados</button>
+    79	        </div>
+    80	        <div class="status" id="status-msg">Clique em "Atualizar Dados" para carregar o conteúdo da planilha.</div>
+    81	    </header>
+    82	
+    83	    <main>
+    84	        <div id="content-area">
+    85	            <span style="color: #999;">Os dados aparecerão aqui após clicar no botão de atualizar. O conteúdo será mantido salvo enquanto você navegar nesta página.</span>
+    86	        </div>
+    87	    </main>
+    88	
+    89	    <script>
+    90	        const SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTw8xiesIkLeVZzonLOKADUxOpVQp8vVrtlIW67gpTOF9EVVdIFbOEXjN2VYLYGjJDbKZcsHxOX47g0/pub?gid=282526832&single=true&output=csv';
+    91	        const CACHE_KEY = 'gran_estudos_notebooklm_data';
+    92	        const CACHE_TIME_KEY = 'gran_estudos_notebooklm_time';
+    93	
+    94	        // Carrega dados salvos ao iniciar (se existir)
+    95	        window.addEventListener('DOMContentLoaded', () => {
+    96	            loadFromCache();
+    97	        });
+    98	
+    99	        function loadFromCache() {
+   100	            const cachedData = localStorage.getItem(CACHE_KEY);
+   101	            const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
+   102	            const contentArea = document.getElementById('content-area');
+   103	            const statusMsg = document.getElementById('status-msg');
+   104	
+   105	            if (cachedData && cachedTime) {
+   106	                const dateStr = new Date(parseInt(cachedTime)).toLocaleString();
+   107	                statusMsg.textContent = `Dados carregados anteriormente em ${dateStr}. Clique em "Atualizar Dados" para buscar a versão mais recente.`;
+   108	                statusMsg.style.color = '#28a745';
+   109	                contentArea.textContent = cachedData;
+   110	            } else {
+   111	                statusMsg.textContent = 'Nenhum dado em cache. Clique em "Atualizar Dados" para carregar da planilha.';
+   112	            }
+   113	        }
+   114	
+   115	        async function fetchData() {
+   116	            const btn = document.getElementById('refresh-btn');
+   117	            const contentArea = document.getElementById('content-area');
+   118	            const statusMsg = document.getElementById('status-msg');
+   119	
+   120	            btn.disabled = true;
+   121	            btn.textContent = 'Carregando...';
+   122	            contentArea.innerHTML = '<span class="loading">Buscando dados atualizados na planilha Google Sheets...</span>';
+   123	
+   124	            try {
+   125	                // Adiciona timestamp para evitar cache do navegador
+   126	                const fetchUrl = `${SHEET_CSV_URL}&t=${new Date().getTime()}`;
+   127	                const response = await fetch(fetchUrl);
+   128	
+   129	                if (!response.ok) {
+   130	                    throw new Error(`Erro HTTP: ${response.status}`);
+   131	                }
+   132	
+   133	                const csvText = await response.text();
+   134	                
+   135	                // Processa o CSV para formato de texto legível pelo NotebookLM
+   136	                const formattedText = processCSVToText(csvText);
+   137	
+   138	                // Salva no cache do navegador
+   139	                localStorage.setItem(CACHE_KEY, formattedText);
+   140	                localStorage.setItem(CACHE_TIME_KEY, new Date().getTime().toString());
+   141	
+   142	                // Atualiza a tela
+   143	                contentArea.textContent = formattedText;
+   144	                const nowStr = new Date().toLocaleString();
+   145	                statusMsg.textContent = `Dados atualizados com sucesso em ${nowStr}. Pronto para análise no NotebookLM!`;
+   146	                statusMsg.style.color = '#28a745';
+   147	
+   148	            } catch (error) {
+   149	                console.error('Erro ao buscar dados:', error);
+   150	                contentArea.innerHTML = `<span class="error">Erro ao carregar dados: ${error.message}.\nVerifique sua conexão ou se a planilha está pública.</span>`;
+   151	                statusMsg.textContent = 'Falha no carregamento. Tente novamente.';
+   152	                statusMsg.style.color = '#dc3545';
+   153	            } finally {
+   154	                btn.disabled = false;
+   155	                btn.textContent = '🔄 Atualizar Dados';
+   156	            }
+   157	        }
+   158	
+   159	        function processCSVToText(csv) {
+   160	            const rows = csv.split('\n').map(row => row.trim()).filter(row => row.length > 0);
+   161	            
+   162	            if (rows.length === 0) return "Nenhum dado encontrado na planilha.";
+   163	
+   164	            const headers = parseCSVLine(rows[0]);
+   165	            let output = "";
+   166	
+   167	            output += `RELATÓRIO DE QUESTÕES - GRAN ESTUDOS\n`;
+   168	            output += `Total de registros: ${rows.length - 1}\n`;
+   169	            output += `==================================================\n\n`;
+   170	
+   171	            for (let i = 1; i < rows.length; i++) {
+   172	                const values = parseCSVLine(rows[i]);
+   173	                output += `QUESTÃO #${i}\n`;
+   174	                
+   175	                headers.forEach((header, index) => {
+   176	                    const value = values[index] || "N/A";
+   177	                    output += `${header}: ${value}\n`;
+   178	                });
+   179	                output += `\n--------------------------------------------------\n\n`;
+   180	            }
+   181	
+   182	            return output;
+   183	        }
+   184	
+   185	        function parseCSVLine(text) {
+   186	            const result = [];
+   187	            let current = '';
+   188	            let inQuotes = false;
+   189	            
+   190	            for (let i = 0; i < text.length; i++) {
+   191	                const char = text[i];
+   192	                const nextChar = text[i + 1];
+   193	
+   194	                if (char === '"') {
+   195	                    if (inQuotes && nextChar === '"') {
+   196	                        current += '"';
+   197	                        i++;
+   198	                    } else {
+   199	                        inQuotes = !inQuotes;
+   200	                    }
+   201	                } else if (char === ',' && !inQuotes) {
+   202	                    result.push(current.trim());
+   203	                    current = '';
+   204	                } else {
+   205	                    current += char;
+   206	                }
+   207	            }
+   208	            result.push(current.trim());
+   209	            return result;
+   210	        }
+   211	    </script>
+   212	</body>
+   213	</html>
