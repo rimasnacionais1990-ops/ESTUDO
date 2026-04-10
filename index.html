@@ -28,7 +28,12 @@
             margin: 0;
         }
         .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
             margin-top: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
         }
         button {
             background-color: #3498db;
@@ -39,6 +44,9 @@
             cursor: pointer;
             font-size: 14px;
             transition: background 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         button:hover {
             background-color: #2980b9;
@@ -46,6 +54,10 @@
         button:disabled {
             background-color: #bdc3c7;
             cursor: not-allowed;
+        }
+        button svg {
+            width: 18px;
+            height: 18px;
         }
         .status {
             font-size: 0.9rem;
@@ -68,6 +80,15 @@
             color: #dc3545;
             font-weight: bold;
         }
+        #last-update {
+            color: #666;
+            font-size: 13px;
+            margin-left: 10px;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -75,7 +96,23 @@
     <header>
         <h1>Gran Estudos — Histórico de Questões</h1>
         <div class="controls">
-            <button id="refresh-btn" onclick="fetchData()">🔄 Atualizar Dados</button>
+            <button id="refresh-btn" onclick="fetchData()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M1 20v-6h6"></path>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                </svg>
+                Atualizar Dados
+            </button>
+            <button onclick="downloadCSV()">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Baixar CSV
+            </button>
+            <span id="last-update"></span>
         </div>
         <div class="status" id="status-msg">Clique em "Atualizar Dados" para carregar o conteúdo da planilha.</div>
     </header>
@@ -101,14 +138,17 @@
             const cachedTime = localStorage.getItem(CACHE_TIME_KEY);
             const contentArea = document.getElementById('content-area');
             const statusMsg = document.getElementById('status-msg');
+            const lastUpdateSpan = document.getElementById('last-update');
 
             if (cachedData && cachedTime) {
                 const dateStr = new Date(parseInt(cachedTime)).toLocaleString();
                 statusMsg.textContent = `Dados carregados anteriormente em ${dateStr}. Clique em "Atualizar Dados" para buscar a versão mais recente.`;
                 statusMsg.style.color = '#28a745';
                 contentArea.textContent = cachedData;
+                lastUpdateSpan.textContent = `Última atualização: ${dateStr}`;
             } else {
                 statusMsg.textContent = 'Nenhum dado em cache. Clique em "Atualizar Dados" para carregar da planilha.';
+                lastUpdateSpan.textContent = '';
             }
         }
 
@@ -116,9 +156,10 @@
             const btn = document.getElementById('refresh-btn');
             const contentArea = document.getElementById('content-area');
             const statusMsg = document.getElementById('status-msg');
+            const lastUpdateSpan = document.getElementById('last-update');
 
             btn.disabled = true;
-            btn.textContent = 'Carregando...';
+            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="animation: spin 1s linear infinite;"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Carregando...`;
             contentArea.innerHTML = '<span class="loading">Buscando dados atualizados na planilha Google Sheets...</span>';
 
             try {
@@ -144,15 +185,17 @@
                 const nowStr = new Date().toLocaleString();
                 statusMsg.textContent = `Dados atualizados com sucesso em ${nowStr}. Pronto para análise no NotebookLM!`;
                 statusMsg.style.color = '#28a745';
+                lastUpdateSpan.textContent = `Última atualização: ${nowStr}`;
 
             } catch (error) {
                 console.error('Erro ao buscar dados:', error);
                 contentArea.innerHTML = `<span class="error">Erro ao carregar dados: ${error.message}.\nVerifique sua conexão ou se a planilha está pública.</span>`;
                 statusMsg.textContent = 'Falha no carregamento. Tente novamente.';
                 statusMsg.style.color = '#dc3545';
+                lastUpdateSpan.textContent = '';
             } finally {
                 btn.disabled = false;
-                btn.textContent = '🔄 Atualizar Dados';
+                btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> Atualizar Dados`;
             }
         }
 
@@ -207,6 +250,25 @@
             }
             result.push(current.trim());
             return result;
+        }
+
+        function downloadCSV() {
+            const cachedData = localStorage.getItem(CACHE_KEY);
+            if (!cachedData) {
+                alert('Nenhum dado disponível para baixar. Clique em "Atualizar Dados" primeiro.');
+                return;
+            }
+            
+            // Converte o texto formatado de volta para CSV simples
+            const blob = new Blob([cachedData], { type: 'text/plain;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `gran-estudos-${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
         }
     </script>
 </body>
